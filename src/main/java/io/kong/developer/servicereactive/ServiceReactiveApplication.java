@@ -15,53 +15,64 @@ import io.dekorate.kubernetes.annotation.Env;
 import io.dekorate.kubernetes.annotation.KubernetesApplication;
 import io.dekorate.kubernetes.annotation.Port;
 
+import javax.annotation.PostConstruct;
+
 @SpringBootApplication
 @KubernetesApplication(
-    ports = @Port(name = "web", containerPort = 8080),
-    envVars = @Env(name = "QUOTE_SERVICE", value = "backToFuture")
+        ports = @Port(name = "web", containerPort = 8080),
+        envVars = @Env(name = "QUOTE_SERVICE", value = "backToFuture")
 )
 public class ServiceReactiveApplication {
 
-  public static void main(String[] args) {
-    SpringApplication.run(ServiceReactiveApplication.class, args);
-  }
+    public static void main(String[] args) {
+        SpringApplication.run(ServiceReactiveApplication.class, args);
+    }
 }
 
 
 @RestController
 class QuoteEndpoint {
 
-  @Value("${QUOTE_SERVICE:backToFuture}")
-  private String quoteConfig;
+    @Value("${QUOTE_SERVICE:backToFuture}")
+    private String quoteConfig;
 
-  @GetMapping(value = "/", produces = {MediaType.APPLICATION_JSON_VALUE})
-  public ResponseEntity<Response> hello() {
-    final Faker faker = Faker.instance();
-    final String quote;
+    private String namespace = "";
 
-    switch (quoteConfig.toUpperCase()) {
-      case "CHUCK":
-        quote = faker.chuckNorris().fact();
-        break;
-      case "HOBBIT":
-        quote = faker.hobbit().quote();
-        break;
-      default:
-        quote = faker.backToTheFuture().quote();
+    @PostConstruct
+    void init() {
+        if (System.getenv().containsKey("KUBERNETES_NAMESPACE")) {
+            namespace = System.getenv("KUBERNETES_NAMESPACE");
+        }
     }
-    return new ResponseEntity<>(new Response(quote), HttpStatus.OK);
-  }
+
+    @GetMapping(value = "/", produces = {MediaType.APPLICATION_JSON_VALUE})
+    public ResponseEntity<Response> hello() {
+        final Faker faker = Faker.instance();
+        final String quote;
+
+        switch (quoteConfig.toUpperCase()) {
+            case "CHUCK":
+                quote = faker.chuckNorris().fact();
+                break;
+            case "HOBBIT":
+                quote = faker.hobbit().quote();
+                break;
+            default:
+                quote = faker.backToTheFuture().quote();
+        }
+        return new ResponseEntity<>(new Response(namespace + " : " + quote), HttpStatus.OK);
+    }
 }
 
 class Response {
 
-  private final String message;
+    private final String message;
 
-  Response(final String message) {
-    this.message = message;
-  }
+    Response(final String message) {
+        this.message = message;
+    }
 
-  public String getMessage() {
-    return message;
-  }
+    public String getMessage() {
+        return message;
+    }
 }
